@@ -2,6 +2,11 @@ package com.example.bank.assignment.repository;
 
 import com.example.bank.assignment.mapper.AccountRowMapper;
 import com.example.bank.assignment.model.Account;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -18,12 +23,12 @@ public class JdbcAccountsRepository implements AccountsRepository {
 
     @Override
     public int save(Account account) {
-         return jdbcTemplate.update("INSERT INTO accounts (account_number,account_holder_name,mobile_number,balance, password) VALUES(?,?,?,?,?)",
-                account.getAccountNumber(),account.getAccountHolderName(),account.getMobileNumber(),account.getBalance(), account.getPassword() );
+         return jdbcTemplate.update("INSERT INTO useraccount (account_holder_name,gender,mobile_number,address,account_type,account_balance, password) VALUES(?,?,?,?,?,?,?)",
+                account.getAccountHolderName(),account.getGender(),account.getMobileNumber(),account.getAddress(),account.getAccountType(),account.getAccountBalance(), account.getPassword() );
     }
     @Override
-    public Account findById(String accountNumber) {
-        String sql = "SELECT * FROM accounts WHERE account_number = ?";
+    public Account findById(UUID accountNumber) {
+        String sql = "SELECT * FROM useraccount WHERE account_number = ?";
         Object[] params = { accountNumber };
 
         try {
@@ -34,8 +39,8 @@ public class JdbcAccountsRepository implements AccountsRepository {
     }
     
     
-    public Account findByIdAndPassword(String accountNumber,String password) {
-        String sql = "SELECT * FROM accounts WHERE account_number = ? AND password=?";
+    public Account findByIdAndPassword(UUID accountNumber,String password) {
+        String sql = "SELECT * FROM useraccount WHERE account_number = ? AND password=?";
         Object[] params = { accountNumber, password };
 
         try {
@@ -45,8 +50,8 @@ public class JdbcAccountsRepository implements AccountsRepository {
         }
     }
     @Override
-    public void delete(String accountNumber, String password) {
-        String sql = "DELETE FROM accounts WHERE account_number = ? AND password=?";
+    public void delete(UUID accountNumber, String password) {
+        String sql = "DELETE FROM useraccount WHERE account_number = ? AND password=?";
         Object[] params = { accountNumber , password};
 
         int rowsAffected = jdbcTemplate.update(sql, params);
@@ -56,29 +61,55 @@ public class JdbcAccountsRepository implements AccountsRepository {
             throw new RuntimeException("Failed to delete the account.");
         }
     }
-    @Override
-    public Account updateMobileNumber(String accountNumber, String newMobileNumber, String password) {
-        String sql = "UPDATE accounts SET mobile_number = ? WHERE account_number = ? AND password=?";
-        Object[] params = { newMobileNumber, accountNumber, password };
+    
+    public void update(Account account) {
+        UUID accountNumber = account.getAccountNumber();
+        String accountHolderName = account.getAccountHolderName();
+        String mobileNumber = account.getMobileNumber();
+        String address = account.getAddress();
 
-        int rowsAffected = jdbcTemplate.update(sql, params);
+        StringBuilder query = new StringBuilder("UPDATE useraccount SET ");
+        List<Object> params = new ArrayList<>();
 
-        if (rowsAffected > 0) {
-            return findById(accountNumber);
-        } else {
-            // Handle the case when the update fails
-            throw new RuntimeException("Failed to update the mobile number for the account.");
+        if (accountHolderName != null) {
+            query.append("account_holder_name = ?, ");
+            params.add(accountHolderName);
         }
+
+        if (mobileNumber != null) {
+            query.append("mobile_number = ?, ");
+            params.add(mobileNumber);
+        }
+
+        if (address != null) {
+            query.append("address = ?, ");
+            params.add(address);
+        }
+
+        // Remove the last comma and space if there are columns to update
+        if (query.charAt(query.length() - 2) == ',') {
+            query.delete(query.length() - 2, query.length());
+        }
+
+        query.append(" WHERE account_number = ?");
+        params.add(accountNumber);
+
+        String sql = query.toString();
+
+        jdbcTemplate.update(sql, params.toArray());
     }
+
+    
+    
     @Override
-    public void creditAmount(String accountNumber, double amount, String password) {
+    public void creditAmount(UUID accountNumber, double amount, String password) {
         Account account = findByIdAndPassword(accountNumber,password);
         if (account != null) {
-            double newBalance = account.getBalance() + amount;
-            account.setBalance(newBalance);
+            double newaccountBalance = account.getAccountBalance() + amount;
+            account.setAccountBalance(newaccountBalance);
 
-            String sql = "UPDATE accounts SET balance = ? WHERE account_number = ?";
-            Object[] params = { account.getBalance(), accountNumber };
+            String sql = "UPDATE useraccount SET account_balance = ? WHERE account_number = ?";
+            Object[] params = { account.getAccountBalance(), accountNumber };
 
             int rowsAffected = jdbcTemplate.update(sql, params);
 
@@ -92,15 +123,15 @@ public class JdbcAccountsRepository implements AccountsRepository {
         }
     }
     @Override
-    public void debitAmount(String accountNumber, double amount, String password) {
+    public void debitAmount(UUID accountNumber, double amount, String password) {
         Account account = findByIdAndPassword(accountNumber,password);
         if (account != null) {
-            double newBalance = account.getBalance() - amount;
-            if (newBalance >= 0) {
-                account.setBalance(newBalance);
+            double newaccountBalance = account.getAccountBalance() - amount;
+            if (newaccountBalance >= 0) {
+                account.setAccountBalance(newaccountBalance);
 
-                String sql = "UPDATE accounts SET balance = ? WHERE account_number = ?";
-                Object[] params = { account.getBalance(), accountNumber };
+                String sql = "UPDATE useraccount SET account_balance = ? WHERE account_number = ?";
+                Object[] params = { account.getAccountBalance(), accountNumber };
 
                 int rowsAffected = jdbcTemplate.update(sql, params);
 
@@ -109,8 +140,8 @@ public class JdbcAccountsRepository implements AccountsRepository {
                     throw new RuntimeException("Failed to debit amount from the account.");
                 }
             } else {
-                // Handle the case when the account balance is insufficient
-                throw new RuntimeException("Insufficient balance in the account.");
+                // Handle the case when the account accountBalance is insufficient
+                throw new RuntimeException("Insufficient accountBalance in the account.");
             }
         }
         else {
